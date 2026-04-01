@@ -8,7 +8,7 @@ app = Flask(__name__)
 ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID")
 AUTH_TOKEN  = os.environ.get("TWILIO_AUTH_TOKEN")
 TWILIO_WA_NUMBER = "whatsapp:+14155238886"  # Twilio Sandbox number (change after approval)
-OWNER_WA = "whatsapp:+13479077077"           # Your WhatsApp number
+OWNER_WA = "whatsapp:+13475171517"           # Your WhatsApp number
 APPOINTMENT_URL = "https://app.acuityscheduling.com/schedule/59bf9b8d"
 
 client = Client(ACCOUNT_SID, AUTH_TOKEN)
