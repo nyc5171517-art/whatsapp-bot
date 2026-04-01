@@ -49,8 +49,7 @@ def forward_media(from_number, media_url, media_type):
     client.messages.create(
         from_=TWILIO_WA_NUMBER,
         to=OWNER_WA,
-        body=f"📥 Media from client {from_number}:",
-        media_url=[media_url]
+        body=f"📥 Media from client {from_number}:\n{media_url}"
     )
 
 @app.route("/webhook", methods=["POST"])
