@@ -227,6 +227,13 @@ def handle_owner(from_chat, body):
                     f"{price_text}\n\n"
                     f"💬 Ready to book?\n📅 {APPOINTMENT_URL}"
                 )
+                send_message(client_chat,
+                    "💬 Do you have any questions?\n\n"
+                    "1️⃣ — How long do extensions last?\n"
+                    "2️⃣ — Correction cost?\n"
+                    "3️⃣ — Where are you located?\n"
+                    "4️⃣ — Nearest appointment?"
+                )
                 send_to_owner(f"✅ Price sent to {client_chat}")
                 user_state[client_chat] = "faq"
         return
