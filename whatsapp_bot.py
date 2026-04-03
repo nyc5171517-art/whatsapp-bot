@@ -159,6 +159,10 @@ def webhook():
 
     # FAQ
     if state == "faq":
+        if body == "5":
+            user_state[from_chat] = "custom_question"
+            send_message(from_chat, "✍️ Please type your question and we'll get back to you shortly!")
+            return "", 200
         if body in FAQ:
             q, a = FAQ[body]
             send_message(from_chat, f"*{q}*\n\n{a}")
@@ -167,7 +171,8 @@ def webhook():
                 "1️⃣ — How long do extensions last?\n"
                 "2️⃣ — Correction cost?\n"
                 "3️⃣ — Where are you located?\n"
-                "4️⃣ — Nearest appointment?\n\n"
+                "4️⃣ — Nearest appointment?\n"
+                "5️⃣ — Ask my own question\n\n"
                 f"📅 Book here: {APPOINTMENT_URL}"
             )
         elif body.lower() == "book":
@@ -179,9 +184,20 @@ def webhook():
                 "1️⃣ — How long do extensions last?\n"
                 "2️⃣ — Correction cost?\n"
                 "3️⃣ — Where are you located?\n"
-                "4️⃣ — Nearest appointment?\n\n"
+                "4️⃣ — Nearest appointment?\n"
+                "5️⃣ — Ask my own question\n\n"
                 f"📅 Or book here: {APPOINTMENT_URL}"
             )
+        return "", 200
+
+    # Custom question from client
+    if state == "custom_question":
+        send_to_owner(
+            f"❓ Question from {sender_name} ({from_chat}):\n\n{body}\n\n"
+            f"To reply: REPLY"
+        )
+        send_message(from_chat, "✅ Your question has been received! Our specialist will reply shortly. 😊")
+        user_state[from_chat] = "faq"
         return "", 200
 
     # Catch-all: forward text to owner
@@ -195,7 +211,8 @@ def webhook():
         "1️⃣ — How long do extensions last?\n"
         "2️⃣ — Correction cost?\n"
         "3️⃣ — Where are you located?\n"
-        "4️⃣ — Nearest appointment?"
+        "4️⃣ — Nearest appointment?\n"
+        "5️⃣ — Ask my own question"
     )
     user_state[from_chat] = "faq"
     return "", 200
@@ -238,7 +255,8 @@ def handle_owner(from_chat, body):
                     "1️⃣ — How long do extensions last?\n"
                     "2️⃣ — Correction cost?\n"
                     "3️⃣ — Where are you located?\n"
-                    "4️⃣ — Nearest appointment?"
+                    "4️⃣ — Nearest appointment?\n"
+                    "5️⃣ — Ask my own question"
                 )
                 send_to_owner(f"✅ Price sent to {client_chat}")
                 user_state[client_chat] = "faq"
