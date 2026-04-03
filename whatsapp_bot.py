@@ -148,10 +148,9 @@ def webhook():
                 f"👤 {sender_name}\n"
                 f"🎯 {goal}\n\n"
                 f"💰 Reply with a number to send price:\n{price_list}\n\n"
-                f"Or:\n"
                 f"1,2 — send two prices\n"
-                f"PHOTO — request new photo\n"
-                f"REPLY — write custom message"
+                f"8 — request new photo\n"
+                f"9 — write custom message"
             )
         else:
             send_message(from_chat, "Please reply with *1*, *2*, or *3* to choose your goal.")
@@ -225,9 +224,30 @@ def handle_owner(from_chat, body):
 
     cmd = parts[0].upper()
 
-    # Quick reply: just numbers like "3" or "1,2"
+    # Quick reply: just numbers like "3" or "1,2" or "8" (photo) or "9" (reply)
     if cmd in ("PHOTO", "REPLY") or cmd == "SEND":
         pass  # handled below
+    elif parts[0] == "8":
+        client_chat = owner_current_client.get(from_chat)
+        if not client_chat:
+            send_to_owner("⚠️ No active client.")
+            return
+        send_message(client_chat,
+            "📸 Thank you for reaching out!\n\n"
+            "To give you the most accurate price estimate, please send us another *photo or video* "
+            "from the back, in good natural lighting, with your hair down. 🙏"
+        )
+        user_state[client_chat] = "awaiting_media"
+        send_to_owner(f"✅ Photo request sent.")
+        return
+    elif parts[0] == "9":
+        client_chat = owner_current_client.get(from_chat)
+        if not client_chat:
+            send_to_owner("⚠️ No active client.")
+            return
+        owner_reply[from_chat] = client_chat
+        send_to_owner("✍️ Type your reply — it will be sent to client:")
+        return
     elif all(c.isdigit() or c == ',' for c in parts[0]):
         client_chat = owner_current_client.get(from_chat)
         if not client_chat:
