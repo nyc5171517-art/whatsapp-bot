@@ -161,10 +161,10 @@ def webhook():
             send_message(from_chat, f"*{q}*\n\n{a}")
             send_message(from_chat,
                 "💬 Any other questions? Reply with a number:\n"
-                "1 — How long do extensions last?\n"
-                "2 — Correction cost?\n"
-                "3 — Where are you located?\n"
-                "4 — Nearest appointment?\n\n"
+                "1️⃣ — How long do extensions last?\n"
+                "2️⃣ — Correction cost?\n"
+                "3️⃣ — Where are you located?\n"
+                "4️⃣ — Nearest appointment?\n\n"
                 f"📅 Book here: {APPOINTMENT_URL}"
             )
         elif body.lower() == "book":
@@ -182,10 +182,10 @@ def webhook():
     send_message(from_chat,
         "✅ Your message has been received! Our specialist will reply shortly. 😊\n\n"
         "💬 Or ask a question:\n"
-        "1 — How long do extensions last?\n"
-        "2 — Correction cost?\n"
-        "3 — Where are you located?\n"
-        "4 — Nearest appointment?"
+        "1️⃣ — How long do extensions last?\n"
+        "2️⃣ — Correction cost?\n"
+        "3️⃣ — Where are you located?\n"
+        "4️⃣ — Nearest appointment?"
     )
     user_state[from_chat] = "faq"
     return "", 200
