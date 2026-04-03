@@ -1,8 +1,11 @@
 import os
+import json
 import requests
 from flask import Flask, request
 
 app = Flask(__name__)
+import logging
+logging.basicConfig(level=logging.INFO)
 
 ID_INSTANCE    = os.environ.get("GREEN_API_ID_INSTANCE", "7107571360")
 API_TOKEN      = os.environ.get("GREEN_API_TOKEN", "")
@@ -63,7 +66,10 @@ def webhook():
     if not data:
         return "", 200
 
+    app.logger.info(f"WEBHOOK: {json.dumps(data)}")
+
     if data.get("typeWebhook") != "incomingMessageReceived":
+        app.logger.info(f"SKIPPED typeWebhook: {data.get('typeWebhook')}")
         return "", 200
 
     sender_data  = data.get("senderData", {})
