@@ -15,9 +15,10 @@ OWNER_CHAT     = "13475171517@c.us"   # личный номер — сюда п�
 APPOINTMENT_URL = "https://app.acuityscheduling.com/schedule/59bf9b8d"
 
 # In-memory state
-user_state  = {}   # chatId → step
-user_data   = {}   # chatId → {name, goal}
-owner_reply = {}   # OWNER_CHAT → client chatId
+user_state          = {}   # chatId → step
+user_data           = {}   # chatId → {name, goal}
+owner_reply         = {}   # OWNER_CHAT → client chatId
+owner_current_client = {}  # OWNER_CHAT → last client chatId (for quick price reply)
 
 PRICE_OPTIONS = [
     "$650 — 1 row / 2 wefts (40g) / 90 min",
@@ -137,18 +138,17 @@ def webhook():
                 f"✅ {goal}\n\n"
                 "⏳ Our specialist is reviewing your submission and will send you a price estimate shortly!"
             )
+            owner_current_client[OWNER_CHAT] = from_chat
             price_list = "\n".join([f"{i+1}. {p}" for i, p in enumerate(PRICE_OPTIONS)])
             send_to_owner(
                 f"🔔 New client!\n"
                 f"👤 {sender_name}\n"
-                f"📱 {from_chat}\n"
                 f"🎯 {goal}\n\n"
-                f"💰 Reply with:\n"
-                f"SEND 1 {from_chat} — send one price\n"
-                f"SEND 1,2 {from_chat} — send two prices\n"
-                f"PHOTO {from_chat} — request new photo\n"
-                f"REPLY {from_chat} — custom message\n\n"
-                f"Prices:\n{price_list}"
+                f"💰 Reply with a number to send price:\n{price_list}\n\n"
+                f"Or:\n"
+                f"1,2 — send two prices\n"
+                f"PHOTO — request new photo\n"
+                f"REPLY — write custom message"
             )
         else:
             send_message(from_chat, "Please reply with *1*, *2*, or *3* to choose your goal.")
@@ -198,6 +198,32 @@ def handle_owner(from_chat, body):
 
     cmd = parts[0].upper()
 
+    # Quick reply: just numbers like "3" or "1,2"
+    if cmd in ("PHOTO", "REPLY") or cmd == "SEND":
+        pass  # handled below
+    elif all(c.isdigit() or c == ',' for c in parts[0]):
+        client_chat = owner_current_client.get(from_chat)
+        if client_chat:
+            price_nums = parts[0].split(",")
+            prices = []
+            for n in price_nums:
+                try:
+                    idx = int(n.strip()) - 1
+                    if 0 <= idx < len(PRICE_OPTIONS):
+                        prices.append(PRICE_OPTIONS[idx])
+                except ValueError:
+                    pass
+            if prices:
+                price_text = "\n\n".join([f"✅ Option {i+1}: {p}" for i, p in enumerate(prices)])
+                send_message(client_chat,
+                    f"✨ Here is your personalized recommendation:\n\n"
+                    f"{price_text}\n\n"
+                    f"💬 Ready to book?\n📅 {APPOINTMENT_URL}"
+                )
+                send_to_owner(f"✅ Price sent to {client_chat}")
+                user_state[client_chat] = "faq"
+        return
+
     # SEND 1 chatId  or  SEND 1,2 chatId
     if cmd == "SEND" and len(parts) >= 3:
         price_nums  = parts[1].split(",")
@@ -221,9 +247,11 @@ def handle_owner(from_chat, body):
             user_state[client_chat] = "faq"
         return
 
-    # PHOTO chatId — request new photo
-    if cmd == "PHOTO" and len(parts) >= 2:
-        client_chat = parts[1]
+    # PHOTO — request new photo
+    if cmd == "PHOTO":
+        client_chat = parts[1] if len(parts) >= 2 else owner_current_client.get(from_chat)
+        if not client_chat:
+            return
         send_message(client_chat,
             "📸 Thank you for reaching out!\n\n"
             "To give you the most accurate price estimate, please send us another *photo or video* "
@@ -233,11 +261,13 @@ def handle_owner(from_chat, body):
         send_to_owner(f"✅ Photo request sent to {client_chat}")
         return
 
-    # REPLY chatId — next message goes to client
-    if cmd == "REPLY" and len(parts) >= 2:
-        client_chat = parts[1]
+    # REPLY — next message goes to client
+    if cmd == "REPLY":
+        client_chat = parts[1] if len(parts) >= 2 else owner_current_client.get(from_chat)
+        if not client_chat:
+            return
         owner_reply[from_chat] = client_chat
-        send_to_owner(f"✍️ Type your reply — it will be sent to {client_chat}:")
+        send_to_owner(f"✍️ Type your reply — it will be sent to client:")
         return
 
     # If owner is in reply mode
