@@ -43,7 +43,8 @@ FAQ = {
 
 def send_message(chat_id, text):
     url = f"{BASE_URL}/sendMessage/{API_TOKEN}"
-    requests.post(url, json={"chatId": chat_id, "message": text}, timeout=10)
+    resp = requests.post(url, json={"chatId": chat_id, "message": text}, timeout=10)
+    app.logger.info(f"send_message to {chat_id}: status={resp.status_code} body={resp.text}")
 
 
 def send_file_by_url(chat_id, file_url, file_name, caption=""):
