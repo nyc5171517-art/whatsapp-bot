@@ -89,6 +89,9 @@ def webhook():
         handle_owner(from_chat, body)
         return "", 200
 
+    # Track last client for owner quick replies
+    owner_current_client[OWNER_CHAT] = from_chat
+
     # ── CLIENT flow ─────────────────────────────────────────────────
     state = user_state.get(from_chat, "start")
 
@@ -210,6 +213,9 @@ def handle_owner(from_chat, body):
         pass  # handled below
     elif all(c.isdigit() or c == ',' for c in parts[0]):
         client_chat = owner_current_client.get(from_chat)
+        if not client_chat:
+            send_to_owner("⚠️ No active client. Use: SEND 3 19293982022@c.us")
+            return
         if client_chat:
             price_nums = parts[0].split(",")
             prices = []
