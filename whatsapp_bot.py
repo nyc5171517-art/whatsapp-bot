@@ -171,7 +171,14 @@ def webhook():
             send_message(from_chat, f"📅 Book your appointment here:\n{APPOINTMENT_URL}")
             user_state[from_chat] = "done"
         else:
-            send_message(from_chat, "Please reply with *1*, *2*, *3*, or *4*.")
+            send_message(from_chat,
+                "💬 Choose a question:\n\n"
+                "1️⃣ — How long do extensions last?\n"
+                "2️⃣ — Correction cost?\n"
+                "3️⃣ — Where are you located?\n"
+                "4️⃣ — Nearest appointment?\n\n"
+                f"📅 Or book here: {APPOINTMENT_URL}"
+            )
         return "", 200
 
     # Catch-all: forward text to owner
