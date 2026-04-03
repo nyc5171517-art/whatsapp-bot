@@ -1,22 +1,20 @@
 import os
+import requests
 from flask import Flask, request
-from twilio.rest import Client
-from twilio.twiml.messaging_response import MessagingResponse
 
 app = Flask(__name__)
 
-ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID")
-AUTH_TOKEN  = os.environ.get("TWILIO_AUTH_TOKEN")
-TWILIO_WA_NUMBER = "whatsapp:+14155238886"  # Twilio Sandbox number (change after approval)
-OWNER_WA = "whatsapp:+13475171517"           # Your WhatsApp number
+ID_INSTANCE    = os.environ.get("GREEN_API_ID_INSTANCE", "7107571360")
+API_TOKEN      = os.environ.get("GREEN_API_TOKEN", "")
+BASE_URL       = f"https://7107.api.greenapi.com/waInstance{ID_INSTANCE}"
+
+OWNER_CHAT     = "13475171517@c.us"   # личный номер — сюда приходят уведомления
 APPOINTMENT_URL = "https://app.acuityscheduling.com/schedule/59bf9b8d"
 
-client = Client(ACCOUNT_SID, AUTH_TOKEN)
-
 # In-memory state
-user_state  = {}  # phone → step
-user_data   = {}  # phone → {name, goal}
-owner_reply = {}  # OWNER → client phone (when owner is typing a reply)
+user_state  = {}   # chatId → step
+user_data   = {}   # chatId → {name, goal}
+owner_reply = {}   # OWNER_CHAT → client chatId
 
 PRICE_OPTIONS = [
     "$650 — 1 row / 2 wefts (40g) / 90 min",
@@ -39,93 +37,122 @@ FAQ = {
           f"You can check the nearest available time here:\n{APPOINTMENT_URL}"),
 }
 
-def send_message(to, body):
-    client.messages.create(from_=TWILIO_WA_NUMBER, to=to, body=body)
 
-def send_to_owner(body):
-    client.messages.create(from_=TWILIO_WA_NUMBER, to=OWNER_WA, body=body)
+def send_message(chat_id, text):
+    url = f"{BASE_URL}/sendMessage/{API_TOKEN}"
+    requests.post(url, json={"chatId": chat_id, "message": text}, timeout=10)
 
-def forward_media(from_number, media_url, media_type):
-    client.messages.create(
-        from_=TWILIO_WA_NUMBER,
-        to=OWNER_WA,
-        body=f"📥 Media from client {from_number}:\n{media_url}"
-    )
+
+def send_file_by_url(chat_id, file_url, file_name, caption=""):
+    url = f"{BASE_URL}/sendFileByUrl/{API_TOKEN}"
+    requests.post(url, json={
+        "chatId": chat_id,
+        "urlFile": file_url,
+        "fileName": file_name,
+        "caption": caption
+    }, timeout=10)
+
+
+def send_to_owner(text):
+    send_message(OWNER_CHAT, text)
+
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    from_number = request.form.get("From", "")
-    body        = request.form.get("Body", "").strip()
-    num_media   = int(request.form.get("NumMedia", 0))
-    media_url   = request.form.get("MediaUrl0", "")
-    media_type  = request.form.get("MediaContentType0", "")
+    data = request.json
+    if not data:
+        return "", 200
+
+    if data.get("typeWebhook") != "incomingMessageReceived":
+        return "", 200
+
+    sender_data  = data.get("senderData", {})
+    from_chat    = sender_data.get("chatId", "")
+    sender_name  = sender_data.get("senderName", "Client")
+    message_data = data.get("messageData", {})
+    type_message = message_data.get("typeMessage", "")
+
+    body = ""
+    if type_message == "textMessage":
+        body = message_data.get("textMessageData", {}).get("textMessage", "").strip()
 
     # ── OWNER commands ──────────────────────────────────────────────
-    if from_number == OWNER_WA:
-        handle_owner(from_number, body)
-        return "", 204
+    if from_chat == OWNER_CHAT:
+        handle_owner(from_chat, body)
+        return "", 200
 
     # ── CLIENT flow ─────────────────────────────────────────────────
-    state = user_state.get(from_number, "start")
+    state = user_state.get(from_chat, "start")
 
     # Photo or video received
-    if num_media > 0 and ("image" in media_type or "video" in media_type):
-        user_data[from_number] = user_data.get(from_number, {})
-        user_state[from_number] = "awaiting_goal"
-        forward_media(from_number, media_url, media_type)
-        send_message(from_number,
+    if type_message in ("imageMessage", "videoMessage"):
+        file_data = message_data.get("fileMessageData", {})
+        file_url  = file_data.get("downloadUrl", "")
+        caption   = file_data.get("caption", "")
+        file_name = "photo.jpg" if type_message == "imageMessage" else "video.mp4"
+
+        user_data[from_chat] = user_data.get(from_chat, {"name": sender_name})
+        user_state[from_chat] = "awaiting_goal"
+
+        # Forward media to owner
+        send_file_by_url(OWNER_CHAT, file_url, file_name,
+                         f"📥 Photo from client {sender_name} ({from_chat})")
+
+        send_message(from_chat,
             "✨ Thank you!\n\n"
-            "💬 *What result are you looking for?*\n\n"
+            "💬 What result are you looking for?\n\n"
             "Reply with a number:\n"
             "1️⃣ — Volume only (same length)\n"
             "2️⃣ — Length up to 18 inches\n"
             "3️⃣ — Length up to 24 inches"
         )
-        return "", 204
+        return "", 200
 
     # Start / greeting
     if state == "start" or body.lower() in ["hi", "hello", "start", "привет"]:
-        user_state[from_number] = "awaiting_media"
-        send_message(from_number,
+        user_state[from_chat] = "awaiting_media"
+        send_message(from_chat,
             "👋 Welcome to KAIZER Beauty Salon!\n\n"
             "We specialize in IBE Hair Extensions — the most natural, seamless, and safest method available today.\n\n"
-            "📸 Please send us a *photo or video* of your hair from the back so we can give you an accurate price estimate!"
+            "📸 Please send us a photo or video of your hair from the back so we can give you an accurate price estimate!"
         )
-        return "", 204
+        return "", 200
 
     # Goal selection
     if state == "awaiting_goal":
         goal_map = {"1": "💫 Volume only", "2": "✂️ Length up to 18 inches", "3": "🌿 Length up to 24 inches"}
         goal = goal_map.get(body)
         if goal:
-            user_data[from_number]["goal"] = goal
-            user_state[from_number] = "awaiting_price"
-            send_message(from_number,
-                f"✅ *{goal}*\n\n"
+            user_data[from_chat] = user_data.get(from_chat, {})
+            user_data[from_chat]["goal"] = goal
+            user_state[from_chat] = "awaiting_price"
+            send_message(from_chat,
+                f"✅ {goal}\n\n"
                 "⏳ Our specialist is reviewing your submission and will send you a price estimate shortly!"
             )
             price_list = "\n".join([f"{i+1}. {p}" for i, p in enumerate(PRICE_OPTIONS)])
             send_to_owner(
-                f"🔔 *New client!*\n"
-                f"📱 {from_number}\n"
+                f"🔔 New client!\n"
+                f"👤 {sender_name}\n"
+                f"📱 {from_chat}\n"
                 f"🎯 {goal}\n\n"
-                f"💰 Reply with price number(s):\n{price_list}\n\n"
-                f"Or reply:\n"
-                f"SEND 1 {from_number} — send one price\n"
-                f"SEND 1,2 {from_number} — send two prices\n"
-                f"PHOTO {from_number} — request new photo/video\n"
-                f"REPLY {from_number} — write custom message"
+                f"💰 Reply with:\n"
+                f"SEND 1 {from_chat} — send one price\n"
+                f"SEND 1,2 {from_chat} — send two prices\n"
+                f"PHOTO {from_chat} — request new photo\n"
+                f"REPLY {from_chat} — custom message\n\n"
+                f"Prices:\n{price_list}"
             )
         else:
-            send_message(from_number, "Please reply with *1*, *2*, or *3* to choose your goal.")
-        return "", 204
+            send_message(from_chat, "Please reply with *1*, *2*, or *3* to choose your goal.")
+        return "", 200
 
     # FAQ
     if state == "faq":
         if body in FAQ:
             q, a = FAQ[body]
-            send_message(from_number, f"*{q}*\n\n{a}")
-            send_message(from_number,
+            send_message(from_chat, f"*{q}*\n\n{a}")
+            send_message(from_chat,
                 "💬 Any other questions? Reply with a number:\n"
                 "1 — How long do extensions last?\n"
                 "2 — Correction cost?\n"
@@ -134,18 +161,18 @@ def webhook():
                 f"📅 Book here: {APPOINTMENT_URL}"
             )
         elif body.lower() == "book":
-            send_message(from_number, f"📅 Book your appointment here:\n{APPOINTMENT_URL}")
-            user_state[from_number] = "done"
+            send_message(from_chat, f"📅 Book your appointment here:\n{APPOINTMENT_URL}")
+            user_state[from_chat] = "done"
         else:
-            send_message(from_number, "Please reply with *1*, *2*, *3*, or *4*.")
-        return "", 204
+            send_message(from_chat, "Please reply with *1*, *2*, *3*, or *4*.")
+        return "", 200
 
     # Catch-all: forward text to owner
     send_to_owner(
-        f"❓ Message from {from_number}:\n\n{body}\n\n"
-        f"To reply: REPLY {from_number}"
+        f"❓ Message from {sender_name} ({from_chat}):\n\n{body}\n\n"
+        f"To reply: REPLY {from_chat}"
     )
-    send_message(from_number,
+    send_message(from_chat,
         "✅ Your message has been received! Our specialist will reply shortly. 😊\n\n"
         "💬 Or ask a question:\n"
         "1 — How long do extensions last?\n"
@@ -153,22 +180,21 @@ def webhook():
         "3 — Where are you located?\n"
         "4 — Nearest appointment?"
     )
-    user_state[from_number] = "faq"
-    return "", 204
+    user_state[from_chat] = "faq"
+    return "", 200
 
 
-def handle_owner(from_number, body):
-    """Parse owner commands"""
+def handle_owner(from_chat, body):
     parts = body.strip().split()
     if not parts:
         return
 
     cmd = parts[0].upper()
 
-    # SEND 1 whatsapp:+1xxx  or  SEND 1,2 whatsapp:+1xxx
+    # SEND 1 chatId  or  SEND 1,2 chatId
     if cmd == "SEND" and len(parts) >= 3:
-        price_nums = parts[1].split(",")
-        client_num = parts[2]
+        price_nums  = parts[1].split(",")
+        client_chat = parts[2]
         prices = []
         for n in price_nums:
             try:
@@ -179,42 +205,39 @@ def handle_owner(from_number, body):
                 pass
         if prices:
             price_text = "\n\n".join([f"✅ Option {i+1}: {p}" for i, p in enumerate(prices)])
-            send_message(client_num,
-                f"✨ *Here is your personalized recommendation:*\n\n"
+            send_message(client_chat,
+                f"✨ Here is your personalized recommendation:\n\n"
                 f"{price_text}\n\n"
                 f"💬 Ready to book?\n📅 {APPOINTMENT_URL}"
             )
-            send_to_owner(f"✅ Price sent to {client_num}")
-            user_state[client_num] = "faq"
+            send_to_owner(f"✅ Price sent to {client_chat}")
+            user_state[client_chat] = "faq"
         return
 
-    # PHOTO whatsapp:+1xxx — request new photo
+    # PHOTO chatId — request new photo
     if cmd == "PHOTO" and len(parts) >= 2:
-        client_num = parts[1]
-        send_message(client_num,
+        client_chat = parts[1]
+        send_message(client_chat,
             "📸 Thank you for reaching out!\n\n"
-            "To give you the most accurate price estimate, we kindly ask you to send us another *photo or video*. "
-            "Please make sure it is taken *from the back*, in good natural lighting, with your hair down — "
-            "this will help us clearly see your hair length and volume. 🙏"
+            "To give you the most accurate price estimate, please send us another *photo or video* "
+            "from the back, in good natural lighting, with your hair down. 🙏"
         )
-        user_state[client_num] = "awaiting_media"
-        send_to_owner(f"✅ Photo request sent to {client_num}")
+        user_state[client_chat] = "awaiting_media"
+        send_to_owner(f"✅ Photo request sent to {client_chat}")
         return
 
-    # REPLY whatsapp:+1xxx — next message goes to client
+    # REPLY chatId — next message goes to client
     if cmd == "REPLY" and len(parts) >= 2:
-        client_num = parts[1]
-        owner_reply[OWNER_WA] = client_num
-        send_to_owner(f"✍️ Type your reply — it will be sent to {client_num}:")
+        client_chat = parts[1]
+        owner_reply[from_chat] = client_chat
+        send_to_owner(f"✍️ Type your reply — it will be sent to {client_chat}:")
         return
 
-    # If owner is in reply mode — send their message to client
-    if OWNER_WA in owner_reply:
-        client_num = owner_reply.pop(OWNER_WA)
-        send_message(client_num,
-            f"💬 *Answer from KAIZER Salon:*\n\n{body}"
-        )
-        send_to_owner(f"✅ Reply sent to {client_num}")
+    # If owner is in reply mode
+    if from_chat in owner_reply:
+        client_chat = owner_reply.pop(from_chat)
+        send_message(client_chat, f"💬 Answer from KAIZER Salon:\n\n{body}")
+        send_to_owner(f"✅ Reply sent to {client_chat}")
         return
 
 
