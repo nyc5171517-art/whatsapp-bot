@@ -19,6 +19,7 @@ user_state          = {}   # chatId → step
 user_data           = {}   # chatId → {name, goal}
 owner_reply         = {}   # OWNER_CHAT → client chatId
 owner_current_client = {}  # OWNER_CHAT → last client chatId (for quick price reply)
+paused_chats         = set()  # chats where bot is paused (owner handles manually)
 
 PRICE_OPTIONS = [
     "$650 — 1 row / 2 wefts (40g) / 90 min",
@@ -95,6 +96,11 @@ def webhook():
     owner_current_client[OWNER_CHAT] = from_chat
 
     # ── CLIENT flow ─────────────────────────────────────────────────
+    # If bot is paused for this client — just forward to owner silently
+    if from_chat in paused_chats:
+        send_to_owner(f"💬 {sender_name} ({from_chat}):\n{body}")
+        return "", 200
+
     state = user_state.get(from_chat, "start")
 
     # Photo or video received
@@ -225,6 +231,20 @@ def handle_owner(from_chat, body):
         return
 
     cmd = parts[0].upper()
+
+    # 0 = pause bot for current client, 00 = resume
+    if parts[0] == "0":
+        client_chat = owner_current_client.get(from_chat)
+        if client_chat:
+            paused_chats.add(client_chat)
+            send_to_owner(f"⏸ Bot paused for {client_chat}. Send 00 to resume.")
+        return
+    if parts[0] == "00":
+        client_chat = owner_current_client.get(from_chat)
+        if client_chat:
+            paused_chats.discard(client_chat)
+            send_to_owner(f"▶️ Bot resumed for {client_chat}.")
+        return
 
     # Quick reply: just numbers like "3" or "1,2" or "8" (photo) or "9" (reply)
     if cmd in ("PHOTO", "REPLY") or cmd == "SEND":
