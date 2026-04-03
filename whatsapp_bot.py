@@ -83,6 +83,8 @@ def webhook():
     body = ""
     if type_message == "textMessage":
         body = message_data.get("textMessageData", {}).get("textMessage", "").strip()
+    elif type_message == "extendedTextMessage":
+        body = message_data.get("extendedTextMessageData", {}).get("text", "").strip()
 
     # ── OWNER commands ──────────────────────────────────────────────
     if from_chat == OWNER_CHAT:
