@@ -193,7 +193,7 @@ def webhook():
     if state == "custom_question":
         send_to_owner(
             f"❓ Question from {sender_name} ({from_chat}):\n\n{body}\n\n"
-            f"To reply: REPLY"
+            f"To reply: send 9"
         )
         send_message(from_chat, "✅ Your question has been received! Our specialist will reply shortly. 😊")
         user_state[from_chat] = "faq"
@@ -202,7 +202,7 @@ def webhook():
     # Catch-all: forward text to owner
     send_to_owner(
         f"❓ Message from {sender_name} ({from_chat}):\n\n{body}\n\n"
-        f"To reply: REPLY {from_chat}"
+        f"To reply: send 9"
     )
     send_message(from_chat,
         "✅ Your message has been received! Our specialist will reply shortly. 😊\n\n"
