@@ -7,8 +7,8 @@ app = Flask(__name__)
 import logging
 logging.basicConfig(level=logging.INFO)
 
-ID_INSTANCE    = os.environ.get("GREEN_API_ID_INSTANCE", "7107571360")
-API_TOKEN      = os.environ.get("GREEN_API_TOKEN", "")
+ID_INSTANCE    = os.environ.get("GREEN_API_ID_INSTANCE", "7107578717")
+API_TOKEN      = os.environ.get("GREEN_API_TOKEN", "499e77e550a04dcb92b4308ad59a225a769f99ea008748e68a")
 BASE_URL       = f"https://7107.api.greenapi.com/waInstance{ID_INSTANCE}"
 
 OWNER_CHAT     = "13475171517@c.us"   # личный номер — сюда приходят уведомления
