@@ -121,10 +121,12 @@ def webhook():
 
     # If this is a known (returning) client with no active conversation — forward to owner silently
     if from_chat in known_clients and state not in ("faq", "custom_question", "awaiting_goal", "awaiting_media", "awaiting_price"):
+        phone = from_chat.replace("@c.us", "")
         send_to_owner(
             f"🔄 *Returning client:* {sender_name}\n"
             f"💬 {body}\n\n"
-            f"Reply with *9* or send *new* to restart bot for this client."
+            f"📱 Reply directly: https://wa.me/{phone}\n"
+            f"Or send *9* to reply via bot, *new* to restart bot."
         )
         return "", 200
 
