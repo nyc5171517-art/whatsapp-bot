@@ -79,6 +79,12 @@ def send_to_owner(text):
     send_message(OWNER_CHAT, text)
 
 
+@app.route("/", methods=["GET", "HEAD"])
+@app.route("/ping", methods=["GET", "HEAD"])
+def ping():
+    return "OK", 200
+
+
 @app.route("/webhook", methods=["POST"])
 def webhook():
     data = request.json
