@@ -21,6 +21,22 @@ owner_reply         = {}   # OWNER_CHAT → client chatId
 owner_current_client = {}  # OWNER_CHAT → last client chatId (for quick price reply)
 paused_chats         = set()  # chats where bot is paused (owner handles manually)
 
+# Persistent storage for known clients (saved to file)
+KNOWN_CLIENTS_FILE = "known_clients.json"
+
+def load_known_clients():
+    try:
+        with open(KNOWN_CLIENTS_FILE, "r") as f:
+            return set(json.load(f))
+    except:
+        return set()
+
+def save_known_clients():
+    with open(KNOWN_CLIENTS_FILE, "w") as f:
+        json.dump(list(known_clients), f)
+
+known_clients = load_known_clients()  # clients who already went through the bot
+
 PRICE_OPTIONS = [
     "$650 — 1 row / 2 wefts (40g) / 90 min",
     "$800 — 1 row / 3 wefts (60g) / 90 min",
@@ -99,6 +115,15 @@ def webhook():
     # If bot is paused for this client — just forward to owner silently
     if from_chat in paused_chats:
         send_to_owner(f"💬 {sender_name} ({from_chat}):\n{body}")
+        return "", 200
+
+    # If this is a known (returning) client — forward to owner, don't auto-respond
+    if from_chat in known_clients:
+        send_to_owner(
+            f"🔄 *Returning client:* {sender_name}\n"
+            f"💬 {body}\n\n"
+            f"Reply with *9* or send *new* to restart bot for this client."
+        )
         return "", 200
 
     state = user_state.get(from_chat, "start")
@@ -232,6 +257,16 @@ def handle_owner(from_chat, body):
 
     cmd = parts[0].upper()
 
+    # "new" = restart bot for returning client
+    if parts[0].lower() == "new":
+        client_chat = owner_current_client.get(from_chat)
+        if client_chat:
+            known_clients.discard(client_chat)
+            save_known_clients()
+            user_state[client_chat] = "start"
+            send_to_owner(f"▶️ Bot restarted for {client_chat}. Next message will trigger bot again.")
+        return
+
     # 0 = pause bot for current client, 00 = resume
     if parts[0] == "0":
         client_chat = owner_current_client.get(from_chat)
@@ -302,6 +337,9 @@ def handle_owner(from_chat, body):
                 )
                 send_to_owner(f"✅ Price sent to {client_chat}")
                 user_state[client_chat] = "faq"
+                # Save as known client so bot won't auto-respond next time
+                known_clients.add(client_chat)
+                save_known_clients()
         return
 
     # SEND 1 chatId  or  SEND 1,2 chatId
