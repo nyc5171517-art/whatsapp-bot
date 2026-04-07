@@ -117,16 +117,16 @@ def webhook():
         send_to_owner(f"💬 {sender_name} ({from_chat}):\n{body}")
         return "", 200
 
-    # If this is a known (returning) client — forward to owner, don't auto-respond
-    if from_chat in known_clients:
+    state = user_state.get(from_chat, "start")
+
+    # If this is a known (returning) client with no active conversation — forward to owner silently
+    if from_chat in known_clients and state not in ("faq", "custom_question", "awaiting_goal", "awaiting_media", "awaiting_price"):
         send_to_owner(
             f"🔄 *Returning client:* {sender_name}\n"
             f"💬 {body}\n\n"
             f"Reply with *9* or send *new* to restart bot for this client."
         )
         return "", 200
-
-    state = user_state.get(from_chat, "start")
 
     # Photo or video received
     if type_message in ("imageMessage", "videoMessage"):
